@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nájdi farbu – 50 LEVEL Challenge</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      user-select: none;
+      background: linear-gradient(135deg, #d8f3ff, #e1ffe5);
+    }
+
+    #canvas {
+      display: block;
+    }
+
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #222;
+      font-size: 32px;
+      font-weight: 700;
+      text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+      z-index: 10;
+    }
+
+    #level {
+      position: absolute;
+      top: 70px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #555;
+      font-size: 22px;
+      font-weight: 500;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">Načítavam...</div>
+  <div id="level">Level 1</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const hud = document.getElementById('hud');
+    const levelDisplay = document.getElementById('level');
+
+    const colorNames = ['červená', 'zelená', 'modrá', 'žltá', 'fialová', 'oranžová', 'tyrkysová', 'ružová', 'hnedá', 'sivá'];
+    const colorMap = {
+      'červená': '#e74c3c',
+      'zelená': '#2ecc71',
+      'modrá': '#3498db',
+      'žltá': '#f1c40f',
+      'fialová': '#9b59b6',
+      'oranžová': '#e67e22',
+      'tyrkysová': '#1abc9c',
+      'ružová': '#ff69b4',
+      'hnedá': '#8e5a32',
+      'sivá': '#7f8c8d'
+    };
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Circle {
+      constructor(x, y, radius, colorName) {
+        this.x = x;
+        this.y = y;
+        this.baseRadius = radius;
+        this.radius = radius;
+        this.colorName = colorName;
+        this.color = colorMap[colorName];
+        this.active = true;
+        this.hovered = false;
+      }
+
+      update(mouseX, mouseY) {
+        if (!this.active) return;
+        const dx = mouseX - this.x;
+        const dy = mouseY - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        this.hovered = distance < this.radius;
+        const targetRadius = this.hovered ? this.baseRadius * 1.3 : this.baseRadius;
+        this.radius += (targetRadius - this.radius) * 0.1;
+      }
+
+      draw() {
+        if (!this.active) return;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.hovered ? "#00000055" : this.color;
+        ctx.shadowBlur = this.hovered ? 25 : 15;
+        ctx.fill();
+      }
+
+      isClicked(mx, my) {
+        const dx = mx - this.x;
+        const dy = my - this.y;
+        return dx * dx + dy * dy <= this.radius * this.radius;
+      }
+    }
+
+    let circles = [];
+    let targetColor = "";
+    let mouseX = 0;
+    let mouseY = 0;
+    let level = 1;
+    const maxLevel = 50;
+
+    function setupGame() {
+      if (level > maxLevel) {
+        hud.textContent = `🎉 HOTOVO! Dokončil si všetkých ${maxLevel} levelov!`;
+        levelDisplay.textContent = ``;
+        circles = [];
+        return;
+      }
+
+      circles = [];
+      const base = 4;
+      const num = Math.min(base + Math.floor(level * 0.5), colorNames.length);
+      const radius = Math.max(30, 70 - level); // menší pri vyššom leveli
+      const usedColors = [...colorNames].sort(() => Math.random() - 0.5).slice(0, num);
+      const marginX = 100;
+      const marginY = 200;
+      const rowCount = Math.ceil(Math.sqrt(num));
+      const colCount = Math.ceil(num / rowCount);
+
+      for (let i = 0; i < num; i++) {
+        const row = Math.floor(i / colCount);
+        const col = i % colCount;
+        const spacingX = (canvas.width - 2 * marginX) / (colCount - 1 || 1);
+        const spacingY = (canvas.height - 2 * marginY) / (rowCount - 1 || 1);
+        const x = marginX + col * spacingX;
+        const y = marginY + row * spacingY;
+        circles.push(new Circle(x, y, radius, usedColors[i]));
+      }
+
+      const randomIndex = Math.floor(Math.random() * circles.length);
+      targetColor = circles[randomIndex].colorName;
+
+      hud.textContent = `🎯 Nájdi farbu: ${targetColor.toUpperCase()}`;
+      levelDisplay.textContent = `Level ${level}`;
+    }
+
+    function drawAll() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      circles.forEach(c => {
+        c.update(mouseX, mouseY);
+        c.draw();
+      });
+    }
+
+    function gameLoop() {
+      drawAll();
+      requestAnimationFrame(gameLoop);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      for (const circle of circles) {
+        if (circle.active && circle.isClicked(mx, my)) {
+          if (circle.colorName === targetColor) {
+            hud.textContent = `✅ Správne!`;
+            level++;
+            setTimeout(() => setupGame(), 1000);
+          } else {
+            circle.active = false;
+          }
+        }
+      }
+    });
+
+    setupGame();
+    gameLoop();
+  </script>
+</body>
+</html>
